@@ -1,6 +1,8 @@
-import java.util.*;
 
-public class GeneticAlgorithmKnapsack {
+import java.util.*;
+import java.io.*;
+
+public class GeneticAlgoritimo {
     static class Item {
         int weight;
         int value;
@@ -12,15 +14,17 @@ public class GeneticAlgorithmKnapsack {
     }
 
     public static void main(String[] args) {
-        // Exemplo de itens e capacidade da mochila
-        Item[] items = {
-            new Item(2, 10),
-            new Item(3, 7),
-            new Item(4, 14),
-            new Item(5, 5),
-            new Item(6, 3)
-        };
-        int capacity = 10;
+        // Ler dados do arquivo
+        String fileName = "C:/Users/caual/Documents/MInha Pasta 3/instancias-mochila/KNAPDATA40";
+        Item[] items;
+        int capacity;
+        try {
+            items = readItems(fileName);
+            capacity = readCapacity(fileName);
+        } catch (IOException e) {
+            System.err.println("Erro na leitura do arquivo: " + e.getMessage());
+            return;
+        }
 
         // Parâmetros do algoritmo genético
         int populationSize = 50;
@@ -35,13 +39,34 @@ public class GeneticAlgorithmKnapsack {
         System.out.println("Itens selecionados:");
         for (int i = 0; i < items.length; i++) {
             if (solution[i] == 1) {
-                System.out.println("Item " + (i+1) + ": Peso = " + items[i].weight + ", Valor = " + items[i].value);
+                System.out.println("Item " + (i + 1) + ": Peso = " + items[i].weight + ", Valor = " + items[i].value);
             }
         }
     }
 
-    // Função para implementar o algoritmo genético para o Problema da Mochila
-    int[] genetic_algorithm_knapsack(Item[] items, int capacity, int populationSize, double crossoverRate, double mutationRate, int numGenerations) {
+    static Item[] readItems(String fileName) throws IOException {
+        BufferedReader reader = new BufferedReader(new FileReader(fileName));
+        reader.readLine(); // Pular a linha da capacidade
+        int numItems = Integer.parseInt(reader.readLine().trim());
+        Item[] items = new Item[numItems];
+
+        for (int i = 0; i < numItems; i++) {
+            String[] itemData = reader.readLine().trim().split(",");
+            items[i] = new Item(Integer.parseInt(itemData[1]), Integer.parseInt(itemData[2]));
+        }
+
+        reader.close();
+        return items;
+    }
+
+    static int readCapacity(String fileName) throws IOException {
+        BufferedReader reader = new BufferedReader(new FileReader(fileName));
+        int capacity = Integer.parseInt(reader.readLine().trim());
+        reader.close();
+        return capacity;
+    }
+
+    static int[] genetic_algorithm_knapsack(Item[] items, int capacity, int populationSize, double crossoverRate, double mutationRate, int numGenerations) {
         int[][] population = generate_initial_population(items.length, populationSize);
         Random rand = new Random();
 
@@ -71,8 +96,7 @@ public class GeneticAlgorithmKnapsack {
         return bestSolution;
     }
 
-    // Função para gerar uma população inicial aleatória
-    int[][] generate_initial_population(int size, int populationSize) {
+    static int[][] generate_initial_population(int size, int populationSize) {
         int[][] population = new int[populationSize][size];
         Random rand = new Random();
         for (int i = 0; i < populationSize; i++) {
@@ -83,8 +107,7 @@ public class GeneticAlgorithmKnapsack {
         return population;
     }
 
-    // Função de fitness para calcular o valor total da mochila
-    int fitness_function(int[] solution, Item[] items, int capacity) {
+    static int fitness_function(int[] solution, Item[] items, int capacity) {
         int totalValue = 0;
         int totalWeight = 0;
         for (int i = 0; i < solution.length; i++) {
@@ -93,24 +116,19 @@ public class GeneticAlgorithmKnapsack {
                 totalWeight += items[i].weight;
             }
         }
-        // Penalize soluções que excedam a capacidade da mochila
-		// Implemente o método de penalização que achar mais adequado
         if (totalWeight > capacity) {
-            totalValue = 0;
+            totalValue -= (totalWeight - capacity) * 2; // Penaliza baseado no excesso de peso
         }
-        return totalValue;
+        return Math.max(totalValue, 1); // Garante que o fitness mínimo é sempre positivo
     }
 
-    // Função para realizar a seleção por torneio
-    int[] tournament_selection(int[][] population, Item[] items, int capacity) {
-        
+    static int[] tournament_selection(int[][] population, Item[] items, int capacity) {
         Random rand = new Random();
-        int tournamentSize = 5; // Tamanho do torneio
+        int tournamentSize = 5;
         int[] bestSolution = null;
         int bestFitness = Integer.MIN_VALUE;
 
         for (int i = 0; i < tournamentSize; i++) {
-            
             int[] solution = population[rand.nextInt(population.length)];
             int fitness = fitness_function(solution, items, capacity);
             if (fitness > bestFitness) {
@@ -122,77 +140,56 @@ public class GeneticAlgorithmKnapsack {
         return bestSolution;
     }
 
-    // Função para realizar a seleção por roleta
     static int[] roulette_selection(int[][] population, Item[] items, int capacity) {
         Random rand = new Random();
         int totalFitness = 0;
         int[] cumulativeFitness = new int[population.length];
-        int selectedIdx = -1;
 
-        // Calcula o fitness total e o fitness cumulativo
         for (int i = 0; i < population.length; i++) {
             int fitness = fitness_function(population[i], items, capacity);
             totalFitness += fitness;
             cumulativeFitness[i] = totalFitness;
         }
 
-        // Gera um número aleatório dentro do fitness total
-        int randomFitness = rand.nextInt(totalFitness);
-
-        // Encontra o índice do indivíduo selecionado
-        for (int i = 0; i < population.length; i++) {
-            if (randomFitness < cumulativeFitness[i]) {
-                selectedIdx = i;
-                break;
+        if (totalFitness > 0) { // Verifica se o fitness total é positivo
+            int randomFitness = rand.nextInt(totalFitness);
+            for (int i = 0; i < population.length; i++) {
+                if (randomFitness < cumulativeFitness[i]) {
+                    return population[i];
+                }
             }
+        } else {
+            // Se o fitness total for zero, usa seleção aleatória ou por torneio
+            return population[rand.nextInt(population.length)];
         }
-
-        return population[selectedIdx];
+        return null; // Caso inesperado, deveria ser tratado adequadamente
     }
 
-    // Função para realizar o cruzamento (crossover)
-    int[] crossover(int[] parent1, int[] parent2, double crossoverRate) {
-        
+    static int[] crossover(int[] parent1, int[] parent2, double crossoverRate) {
         Random rand = new Random();
         int[] offspring = new int[parent1.length];
-        
-        if (rand.nextDouble() < crossoverRate) { // Realiza o crossover com a taxa especificada
-            
-            int crossoverPoint = rand.nextInt(parent1.length); // Ponto de corte aleatório
-            for (int i = 0; i < crossoverPoint; i++) {
-                offspring[i] = parent1[i];
+        int crossoverPoint = rand.nextInt(parent1.length);
+
+        if (rand.nextDouble() < crossoverRate) {
+            for (int i = 0; i < parent1.length; i++) {
+                if (i < crossoverPoint) {
+                    offspring[i] = parent1[i];
+                } else {
+                    offspring[i] = parent2[i];
+                }
             }
-            
-            for (int i = crossoverPoint; i < parent2.length; i++) {
-                offspring[i] = parent2[i];
-            }
-        } else { // Se não houver crossover, retorna um dos pais
-            offspring = parent1;
+        } else {
+            offspring = (rand.nextDouble() < 0.5) ? parent1.clone() : parent2.clone();
         }
         return offspring;
     }
-        // Completar a função de cruzamento
-        // Retorna um novo indivíduo resultante do crossover entre parent1 e parent2
-		// Não esqueça da probabiidade de cruzamento
-        return null;
-    }
 
-    // Função para realizar a mutação
-    void mutate(int[] solution, double mutationRate) {
-        
+    static void mutate(int[] solution, double mutationRate) {
         Random rand = new Random();
         for (int i = 0; i < solution.length; i++) {
-            if (rand.nextDouble() < mutationRate) { // Aplica a mutação com a taxa especificada
-                solution[i] = (solution[i] == 0) ? 1 : 0; // Inverte o valor do gene
+            if (rand.nextDouble() < mutationRate) {
+                solution[i] = 1 - solution[i]; // Inverte o gene
             }
         }
-    }
-        // Completar a função de mutação
-        // Aplica a mutação na solução fornecida
-		// Não esqueça da probabiidade de mutação
-        
-        // Função para implementar o algoritmo genético para o Problema da Mochila
-    int[] geneticAlgorithmKnapsack(List<Item> items, int capacity, int populationSize, double crossoverRate, double mutationRate, int numGenerations) {
-        // Implementação do algoritmo genético aqui...
-    }
-
+}
+}
